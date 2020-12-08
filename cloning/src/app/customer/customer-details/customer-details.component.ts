@@ -20,6 +20,9 @@ export class CustomerDetailsComponent implements OnInit, OnChanges {
   }
 
   ngOnChanges(changes: SimpleChanges) {
+
+    /* When a new customer comes in this component(why comes in? Because it's an @Input() prop), we detect that entrance(so we check if
+    there is a change to that @Input prop) and in this method, we always call addTax() when some changes happen.*/
     if (changes['customer']) {
       const cust = changes['customer'].currentValue as Customer;
       this.addTax(cust);
@@ -28,6 +31,7 @@ export class CustomerDetailsComponent implements OnInit, OnChanges {
   }
 
   addTax(cust: Customer) {
+    /* It's better to do this in service level.*/
     cust.orderTotalWithTax = cust.orderTotal + (cust.orderTotal * .08);
   }
 
