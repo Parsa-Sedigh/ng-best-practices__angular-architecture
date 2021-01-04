@@ -86,6 +86,35 @@ export class DataService {
     }
   ];
 
+  /* Here, we chose a BehaviorSubject, because I wanted any subscribers to automatically get the LAST value that might have been sent
+  out and that way, we can keep multiple subscribers up to date. So as changes are emitted, one of those components subscribes a little bit
+  later, but they'll still be able to get that last value that was sent to the earlier subscribers.
+
+  So here, we have a BehaviorSubject of Customer array(Customer[]) and we're gonna return this.customers .
+  Now we're NOT gonna expose that subject directly. Because you normally don't want to expose the subject directly. Instead, we're gonna
+  call .asObservable() and that way, whoever subscribes, they just subscribe like normal.
+
+  Now if you scroll a little bit and go to addCustomer() , in that method, when we add a customer, we're gonna call: this.customersSubject$.next()
+  So you see that is exactly the same as what we've done in previous examples.
+  So we raise that data.
+  Now the difference here, is, not only the consumer or observer is subscribing to the service, but it also can go directly to the service, to see
+  what exactly the data is which is being sent(so what is the data that's being sent?). WHEREAS with the event bus, some component or a service, would
+  send an event WITH the data to the event bus, but on the other end or the subscribing end, we don't really know who ultimately sent that data. Again,
+  unless we provide a little more information about who sent that data. Whereas with this approach, not only I do know who I'm subscribing to, but I ALSO
+  know where to go to make data changes.
+  That's all there is about this particular aspect of it(the observable service side). So before going to other side which is the subscribers to this
+  service, let's go to communication tab of the running app, now if you click on add customer(push a clone) button, we know that we are seeing the
+  number of customers in that red circle, which would be updated by each clicking that we do, because we have a subscriber to that added customer and it
+  shows the length of current customers at that circle.
+  Now as you push a new clone of the customer into the list, that's gonna send a notification out to ANY LISTENERS and in our application,
+  the app.component.ts is one of the listeners.
+
+  Notice how much those components(app.component and customers.component). Because the app.component is all the way up to the root and the
+  customers-list.component which is another listener of this observable, is fairly deep in the hierarchy.
+
+   So this was another way to communicate between comps.
+
+   So now let's see how we can actually subscribe to the data(the observable service).*/
   immutableCustomers = List<Customer>();
   immutableProducts = List<Product>();
 

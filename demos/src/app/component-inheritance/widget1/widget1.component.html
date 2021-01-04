@@ -1,3 +1,12 @@
 <h3>{{ value }}</h3>
 
+<!-- Here we're tracking the value prop and the dirty state of this <input> and setting a class called isDirty.
+Now as we type in this <input>(also the <input> of widget2) it's gonna update the value prop(because we're using 2-way data binding with ngModel) and with
+each character we change in this <input> and fire the valueChange custom event through the @Output() property and track the dirty state when the value changes.
+
+So as you type, because of 2-way data binding, the <h3> shows what you typed.
+
+Important: So every time you type sth in this <input> of widget1 comp, because of 2-way data-binding, the value prop of .ts file also gets the latest value
+ and therefore it's setter gets CALLED on EACH keystroke even on space and backspace and because in setter of value prop, we're calling it's getter, the code
+ block of that getter gets called multiple times, when we actually get that prop.-->
 {{ label }} <input type="text" [(ngModel)]="value" required [class.dirty]="isDirty">

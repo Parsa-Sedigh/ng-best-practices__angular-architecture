@@ -10,9 +10,11 @@ export class BaseComponent implements OnInit, OnChanges {
   
   private _value: string;
   @Input() get value() {
+      console.log('in getter');
       return this._value;
   }
   set value(val: string) {
+      console.log('in setter');
       if (val && val !== this._value) {
         this.isDirty = true;
       }
