@@ -560,5 +560,419 @@ export class MyComponent {
 
 So if you want to save some code, we can use SubSink for pretty much everything we do when it comes to unsubscribing from observables that we might have.
 
-You can also take an entirely different approach than those 3 different ones that I showed and for example use takeUntil operatpr.*/
+You can also take an entirely different approach than those 3 different ones that I showed and for example use takeUntil operator.*/
+/* 48-10_Summary:
+We talked about different communication techniques that could be to talk between components at different levels of your app.
 
+- rxjs subjects provide a flexible way to communicate between components (subject, behaviorSubject, replaySubject and asyncSubject).
+We use BehaviorSubject at most because it does provide to new subscribers the last emitted value. That can be convenient when you want to
+KEEP NEW SUBSCRIBERS UP TO DATE with what happened previously.
+
+- behaviorSubject returns the last emitted value to new subscribers
+
+- Then we talked about how subjects can be used in different ways and we walked about a very loosely coupled approach that we can call it the
+ event bus service. This technique provides a middleman type of approach, or a mediator pattern, so a component can send data, another comp can
+ receive it and they don't have to(but you can make it so they would know about each other) know anything about each other. They just have to know
+ about the middleman, which would be the event bus. So it's very loosely coupled.
+ An event bus can be used for loosely coupled communication.
+
+- Another option was the observable service. This provides a way for a component to still subscribe to changes in the service, but the service performs
+all of the work. So from a maintenance standpoint, it's easy to know where to go, if you want to tweak the code in any way.
+
+- unsubscribe from observables. Whether you use the standard ngOnDestroy with subscription properties and then call unsubscribe on those props or
+the @AuthUnsubscribe() decorator, the subsink option or even other techniques like takeUntil() operator. */
+
+/* 49-00_Introduction.5:
+state management:
+In past, we talked about how we could use services and rxjs to manage state and pass it around in an app and that provides a simple way when comps need to
+talk to other comps. However as an app grows, you need to look at code and how you're managing state.
+
+- the need for state management
+- exploring state management options
+   - services
+   - Ngrx(more robust option)
+   - ngrx-data (an extension for ngrx)
+   - observable store
+   - and other options ...
+- reviewing those options and talk about code complexity vs simplicity which will give you sth to think about, as you're deciding on the
+state management technique for your app.
+
+50-01_The Need for State Management:
+When an app is simple enough, you can get away with just what you'd normally use in angular, which is a combination maybe of comps and services.
+However as it gets big and as more developers are involved, state management can be a chore and it can oftentimes be difficult to know WHERE changes
+are coming from?
+
+So assume we have a comp tree and we're gonna use some means to get data into these comps and then if we need to pass from parent to child or vice versa,
+we can just use @Input and @Output props. So let's say we have some type of an object that is gonna to feed us data. That data then flows in and
+comes down to where it's needed. So the data first comes to comp1(from the object) and then goes to comp2. But we don't need state management in this
+case. But as the app grows and more developers become involved, we find that we have multiple objects supplying data and now data changes can be made in
+MULTIPLE places and if developers aren't talking about what they're doing, what happens when the one on the bottom is updating customers, but the
+one at the top is ALSO updating customers and before we know it, customers are now being provided in multiple places.
+(The data of object2 is going to comp4 and then goes to comp6)
+
+Now to further complicate the matter, we might have yet another developer that's also building some type of a means for GETTING STATE into our app(obj3
+which is passing data to comp5 and then goes to comp8) and now we have a mess, because if each of those objects is storing their own unique copies of
+let's say very similar state, then now debugging and maintenance is a chore and as new change requests come in, what you're gonna find, is it's confusing!
+Because you're gonna work with a comp and you're gonna see that oh! this one customers is getting from object2 and this one is getting it from object3, so
+which one I'm supposed to use?
+EX)
+
+      object1(has some data)--->      comp1
+                                     /      \
+                                  comp2     comp3
+                                   /           \
+      object2(has some data)    comp4         comp5             object3(has some data)
+                                /   \          /     \
+                              comp6 comp7  comp8   comp9
+
+state management goals:
+- single source of truth. So that we're not updating state in multiple places and really causing debugging nightmare.
+- predictable. We want things to be predictable.
+- immutable. So we also want immutable state. You need to go through ONE place if you need to change the state, but the state itself never changes and
+  therefore we always create a new state.
+- track state changes. We want better debugging. We might for instance want to track state changes, so that we can see kind of before and after effects and
+  see what action actually caused that state to change? That would make your app easier to debug.
+
+51-02_State Management Options:
+Every app is gonna have data that flows in and out of it, but the need for state management really depends on the needs of the app and what's being
+stored.
+
+Some of the different state that can flow in and out of an app:
+- Of course the app itself may have some state it needs. It might have some URLs that are passed to it, some security information or other types of
+things that are needed.
+
+- There might be some session state that is unique to the user. This could be for example user preferences or settings for that user.
+
+- and then of course you have the actual data used in the application, our entity state. This would be the customers, the orders, the invoices or
+whatever it may be that the application is actually working with them and displaying and then collecting data as(when) the end users are interacting
+with the app.
+
+Now regardless of the type of state you're working with, there are options for managing state in the app.
+- The most simple one would be services. So we can manage state with services.
+- ngrx
+- ngrx-data which is a simplified version of ngrx. It's an extension that wraps ngrx functionality and makes it easier to work with, with much less
+code.
+- observable STORE. This builds UPON the observable services that we mentioned earlier, but adds state management into the mix and it allows different
+subscribers throughout our app, to be notified as(when) our state changes.
+
+There are some other options like akita, ngxs, mobx. So we can look into these, as you're evaluating state management techniques and the
+overall architecture and data that's passed around in your app.*/
+/* 52-03_Angular Services:
+If you want to perform reusable calculations on the frontend, validation or talk to server through HttpClient, then we would use an ng service.
+A service is typically a class with a narrow and well defined purpose. It should do sth specific and do it well. Also services can be used in different
+ways for communication and other tasks.
+Now when it comes to using services for state management, you got to be careful when you're only going with just pure services.
+We can inject services where ever they're needed and we can even provide notifications to subscribers by using subjects.
+
+There are scenarios where services doesn't meet the needs of state management.
+Now as you're working with comps that need data, services are great for that, because they provide a one place to go which results in very good for
+maintenance and for change requests, reuse and ... and if we have other places that need services, that works great as well.
+So we might have many services in an app, that are being used by comps for different tasks. Maybe one is for customers, one is for orders, one for
+invoices and ... .
+
+Now where things start to get complex, is when MULTIPLE services are needed by a given component. So for example, service4 is injected into comp6, but
+then comp5 needs service1(and of course the service3).
+EX)
+
+comp1 \                comp3 \
+       service1                 service2
+comp2 /                comp4 /
+
+
+        comp5 \
+                service3
+        comp6 /
+
+comp7 \
+       service4
+comp8 /
+
+So now things are getting complex. WHY?
+Well, not from the injection standpoint, but what if we as developers didn't realize it and we stored our customers in two of those?
+So we didn't know that we built one service that gets customers and also another services do that too! Therefore that service updates customers and
+also other service updates customers and now before you know it, have a mess!
+
+So how we solve this with services?
+We can still keep services there, but we would need to have a centralized store for our state and then each of those services can then talk to
+that store.
+EX) with store:
+
+service1
+          \ (arrow in both directions)
+            \
+              store   < ------------ >  service3
+            /
+          /(arrow in both directions)
+service4
+
+Now if we can do this in such a way where we can guarantee that the service1 and service3 and service4 are all using the store as the centralized
+storage location for our state, then we could probably get by with this solution. BUT how are we gonna guarantee that:
+1) Every developer is using the store, that we're not mutating the state somewhere else, maybe for example a fourth service is introduced and created and
+that person didn't realize we had this store and therefore they're now updating state where they shouldn't be.
+
+53-04_NgRx:
+ngrx store provides reactive state management for ng apps inspired by redux. Unify the events in your app and derive state using rxjs.
+
+ngrx:
+- redux + rxjs = ngrx
+- the main goal of ngrx is to provide that single source of truth for your state
+- and also a way to provide an immutable data setup, so that we're not mutating or changing data in multiple places throughout the app.
+- provide greater consistency across a team
+- diagnostic tool to watch store. So we can provide a nice debugging experience because ngrx ties into a redux tool that will let you watch your store
+and see changes to your state as it flows throughout your app.
+
+ngrx state flow:
+First off, let's say we have a comp that ultimately needs to get data. Now the de facto angular way would be to inject a service and while it certainly
+viable, that won't necessarily be the ngrx way.
+With ngrx, we're gonna have the following building blocks available:
+First, we're gonna have a store and store is responsible for storing the state of our app. Now this could be ANY type of state that you want. it could be
+app state, session state or entity state.
+
+Now in order to interact with the store and the state(which is inside that store), we're going to send actions into it. Those actions will then
+be passed to sth called reducers. Reducers are basically translators that will take the action, act upon it and then they're gonna interact with
+the store state and then of course we need to get data back to the component and we can do that through selectors.
+
+Learn: So the flow would look like this:
+ A component will send an action. The action goes to a reducer. The reducer is then gonna modify the state in the store and then we get that back(comp
+ get that back) through sth called a selector.
+ Now of course, we might need to talk to a server to get data and that changes things. So for example, if the component needs to get customers,
+ it would send a GetCustomers action. Now that is gonna trigger an effect, which then integrates with the server and gets the data from the
+ server.
+ Now once the effect gets that back from server, that'll(the effect) send the appropriate action that we now have the data. Then it goes
+ through the reducer, which updates our store and then the selector gets our data from state and send it to component. So that's the general flow
+ of how ngrx works.
+
+Diagram:
+component                    -----------------STORE-------
+                             | actions                   |
+effects                      | reducers            state |
+                             | selectors$                |
+server                       --------------------------- |
+
+So ngrx satisfies the key goals that we mentioned for state management and it also provides a very predictable pattern. */
+/* 54-05_NgRx in Action:
+Run the app and go to /customers. There, the sorting and filtering of customers is done locally in the component, so no ngrx there. But as we go
+to orders to view orders, that's gonna load those orders using ngrx and as we edit a customer, that's also gonna be using ngrx.
+So we have a little bit of CRUD operation there.
+
+Install @ngrx/effects, @ngrx/entity, @ngrx/store, @ngrx/store-devtools. Now once that done, create a folder which in this case we created it directly as
+the sub folder of app folder in state-management/ngrx/src and in that store folder, we have actions, effects, reducers and services.
+
+So what's ultimately gonna happen is when the customers needs data, that customers.component is responsible for working with that. So it's gonna
+inject our store and that store is gonna have our entity state. Also we're injecting the selectors, because as the store changes, we want to subscribe
+to that so that component can get those changes and push them down into a child component which in this case is the customers-list.
+
+We're also monitoring when are the customers are loading? That way we can show a spinner if we wanted to go that route.
+The first thing we're gonna do is we're gonna call getCustomers() and that's gonna dispatch an action to the store. Now if you peek definition on
+GetCustomers() in that getCustomers() method, we're gonna see an action definition. You see GetCustomers is a very simple action.
+
+There's actually three of those, there's GetCustomers, which starts it. GetCustomersSuccess which lets us know WHEN the action occurred and we have the
+customers(notice the payload is gonna be a Customer array) and also GetCustomersError which will be called if we have an error.
+
+The action is gonna sent to reducer. So we have a customer.reducer and in the reducer function, it takes the state and the action to perform.
+So in this case, we sent a GetCustomers action and that's gonna come to reducer function and in it's CustomerActions.GET_CUSTOMERS and that case
+would be responsible for returning the appropriate state. But in this case, there's a little bit more of story because we need to get that state
+from a server, so we need an effect. So in reducer, takes the state, make a new object by using {...<x>} and also set loading prop to true.
+So {...state, loading: true} is now gonna interact with the store and specifically with the state IN that store. Now I mentioned there's an
+effect that's gonna be responsible for actually getting the customer. So if we go to customer.effects and there, go to getCustomers$,
+it's gonna monitor for that particular action and when that action occurs, it's gonna call a service, which gets our customers. So if you go to
+definition of getCustomers() method of customerDataService, it's a normal httpClient and that's gonna actually return the data.
+
+So again, we send an action, in this case, that action is gonna be intercepted by the getCustomers$ effect, then that's gonna return our customers.
+Once that happens, our GetCustomersSuccess action is gonna be passed and if there was an error, our GetCustomersError would be passed.
+All of that boils down to the reducer, updating the state in the store. So if effect was sent an GetCustomersSuccess, the GetCustomersSuccess of
+reducer would be called or if the error action was sent, the error of reducer would be called.
+Now what's gonna happen from there, is we also have selectors which in this case is customer.selectors and it's gonna be responsible for, in essence,
+subscribing to the store. So there, we have a getAllCustomers and by calling createSelector() , that's gonna return customer state, which is customers
+in state.customers expression and now if we go to component, that's what we're gonna grab(the customers of customerSelectors).
+
+So the process starts by dispatching an action to the store, but if communicating with server is needed, that action before going to reducer and then
+store, gonna intercepted by effect, so effect gets called, it sends req to server and gets data back, that sends the action to reducer which updates the
+store and then the selector ultimately round-trips the data back to our UI or comp.
+Now from there, we have an observable of Customer array and then we pass that to template and there use async pipe on it.
+
+So you always dispatch an action, reducers get called, maybe effects get called, store gets updates and then selectors return the data back and therefore,
+as long as everybody is dispatching from your comps, everybody will have a very consistent way to work with this.
+
+redux devtools allows you to replay your state and you can rewind and see that state at different points in the application load process by moving further
+or back like a movie.
+
+In the action and then in there, payload, we see the actual customers that we got back.
+
+55-06_ngrx-data:
+ngrx-data is just an extension, more of a wrapper around ngrx, but it simplifies it.
+- it's still ngrx but simplified
+- eliminate ngrx boilerplate code
+- 1 line of code per entity that you want to work with and an entity would be sth like your customer, order, invoice or ...
+
+We'll write a service that acts as kind of a gateway to that entity in order to get the data and you don't even have to write your httpClient type of
+code, if you don't want to.
+
+- we can customize ngrx-data. So if you need to get deeper into a given reducer or a call to the server, then of course you can customize that.
+
+ngrx-data state flow: (how ngrx-data works as far as the state flowing through your app:)
+First, a comp is gonna have an ngrx-data service injected. So instead of dispatching to the store which we do in ngrx, instead, the comp will use
+that service to actually get the data that it needs.
+So the comp will call over to the service and that ngrx-data service will wrap an entity, for instance a customer. Now behind the scenes,
+the service will then communicate with the actions, reducers, effects and selectors and ultimately, update the state store. Now once that's done,
+we'll subscribe to an observable and behind the scenes we still have selectors and so the ngrx-data service will provide a way that we can
+then get to that entity, once it's available.
+So you can see it provides a simple way to get started with ngrx, because now, you're not writing the code for your actions, reducers, effects and
+selectors and therefore a lot less code is actually needed. Redux devtools also gonna work with this, because ngrx-data really is nothing more than
+ngrx under the covers.
+
+diagram:
+component    ngrx-data service                  store
+                    entity        ---->    actions
+                                           reducers         state
+                                           effects
+                                           selectors$
+
+56-07_ngrx-data in Action:
+Now go to ngrx-data/src/app/customers , you see we still have customers$ prop which is an observable of a Customer array, but you note that
+we don't inject any store in that component. Instead we injected a CustomerService. So at this point, it looks like standard angular(without ngrx).
+Now we're gonna use that CustomerService in getCustomers() and we're gonna call getAll() method of that service. But this isn't sth that we wrote,
+it's sth that's part of ngrx-data.
+
+Now in the CustomersService, the magic is that the CustomerService class extends EntityCollectionBase of type Customer which is our entity.
+And we called the base class and we pass the name of entity and serviceElementFactory(by calling super() which with that, we can pass some stuff to base class)
+and you see in fact, there's not even any code to call the server through httpClient for example. It will do that for you out of the box as long
+as you configure your entities in a certain way.
+
+Let's take a closer look at the entity aspect. So go to core/model. So those models are kind of the first step that you'll have to do(which is creating some
+models for your entities).
+Now go to store folder. In there and in entity-metadata, we're gonna define our entities. In this case we have two entities, Customer and Order and we put them
+in entityMetaData variable.
+Now if you need to pluralize the names in different ways, for example if you had "goose" but it needs to be "geese" for it's plural term, then that
+pluralNames object can be passed to entityConfig, in order to define them, so it pluralizes correctly.
+
+The beauty of it, is we have one line of code per entity. Because in entityMetaData, for example for our Customer entity, we have 1 line of code.
+Then, we register them in entityConfig and then if you go to app-store.module(which is where a little bit of magic happens! and notice in ngrxModule.forRoot() ,
+we passed that entityConfig to () of .forRoot() for NgrxDataModule and also those two StoreModule.forRoot() and EffectsModule.forRoot() are the things that we
+also do in REGULAR NGRX because ngrx-data is also ngrx under the covers(and also in ngrx-data, which is the thing we're currently
+using)) ,for registeration of our two entities which those two entities are inside entityConfig, then we passed that entityConfig to NgrxDataModule.
+Learn: So those entities are passed in through entityConfig into NgrxDataModule, so that was for registering our entities.
+
+Also we're tweaking the call to the server a little bit. By default, it will either use a plural name or a singular version, depending
+on if you're getting for example a single customer or multiple and therefore we need to tweak it just a little bit and we wrote: 'customers/' string,
+because it's good to use plural names for EVERYTHING(when interacting with server) whether it's all the customers or just a single customer.
+So you can override various aspects of your app when using ngrx-data, because again, it's still ngrx under the hoods and you can STILL get to
+that functionality if you need to.
+Now it(ngrx-data) does add the bonus functionality of being able to call the server for you, so you don't even have to write your effects or your HttpClient
+calls, if you don't want to.
+So if you go to orders.service , it looks very similar to customers.service , because it extends the same EntityCollectionServiceBase, but then we give it
+the entity TYPE inside generics, which in this case is orders entity. From there, everything is identical to customers.service and that will also make it
+possible us to call and get orders, without ACTUALLY writing the http code!
+
+In orders.component , we used ActivatedRoute to get a route parameter which is 'id' param and the OrdersService, in addition to getAll() which would get
+everything, it also has an api called: getWithQuery() and in there, you can pass in some query strings. So that makes it easy to CUSTOMIZE as you're calling
+the server.
+Now if you don't want to do that and you want to step outside the bounds of that ENTIRELY, that's also possible and you can go back to your normal effects if you'd
+like.
+
+In the end, if we go to customers.component , we call getAll() on the customersService and that call would then call the customers url, get back the customers and
+then that gives us back the observable of a customer array and then, we can go to our view and use async pipe and then we passed it to CustomersList component.
+
+if you see the redux devtools, the first parts(@ngrx/store/init and @ngrx/effects/init and @ngrx/store/update-reducers) of inspector is very similar to ngrx, but
+if you're using a getAll() method for a comp and inspecting the ngrx of that comp using redux devtools, you'll notice a: [<entity type>] ngrx-data/queryall and if you
+click on that, it will show the customers that we're getting the entity and when they come back(which is in [<entity type>] ngrx-data/queryall/success) , success gets
+called and then we have the actual Customer entities.
+
+So we use redux devtools to step into the state and the flow of it, throughout of your app, but yet you don't have to write all that ngrx boilerplate code.
+
+ngrx-data is not appropriate for every app, because it may be that your payloads that you're passing in your actions, your effects, are just SO CUSTOM, that maybe
+this ngrx-data doesn't make sense. */
+/* 57-08_Observable Store:
+Maybe services alone, may not do exactly what you want and maybe ngrx is MORE than what you want. So we're gonna look at a middle ground type of approach.
+Observable store provides a simple way to manage state in a frontend app while acheving many of the key goals offered by more complex state management options.
+
+When we use services, maybe one service was injected into a comp, it made an update, then another service was also injected and turns out it was also
+updating sth and therefore your state was being updated in multiple places.
+
+Observable store goals:
+We want to have a single source of truth. So we want to have that single place, where our data ultimately is stored.
+We want the state to be readonly and(or) immutable.
+Now from there, other comps in the app, might want to know when the state changes. So we might want to provide state change notifications, very similar
+to an observable service.
+We also want the ability to track state history. This gives us a before and after type of view and it makes it much easier to debug.
+We want a very minimum amount of code and in this case(observable store), it's gonna be services with a little bit more.
+The final goal is a little bit unique. It must work with even vanillaJS.
+
+recap:
+- single source of truth
+- state is readonly/immutable
+- provide state change notifications to any subscriber
+- track state change history
+- minimal amount of code required
+- works with any library/framework
+
+A comp is just gonna call a service. Now what's unique about that service is it's gonna extend ObservableStore which is a class which you can
+get it as a npm package and it's gonna maintain the state and provide a simple api for interacting with the state and in addition to
+storing the state, it also tracks it(state), so you'll see a begin and an after type of version of the state, if you'd like to get to that for
+debugging purposes.
+
+As the component calls the service(which must extend ObservableStore), the service will interact with the observable store.
+Now everything else is just normal. If you want to make a call to the server, then you just use HttpClient as normal. Now there's no actions,
+there's no reducers or effects. It's nothing to do with ngrx at all, it's a very simple way to have a single store that multiple services
+could read and write from, in essence and the store is immutable. So you're always getting a fresh copy out of it when updates are made.
+
+Now that alone is useful because now we have a single store that multiple services can interact with. But we also wanted comps throughout an app
+that need to know about changes to the store, to be able to subscribe to those changes. So it also supports that and that gets us back to
+component communication and specifically, observable services.
+Observable services were a way to exchange data between components, but they didn't really do anything when it came to storing the data.
+Think about observable store as like an observable service, but with an api and a history tracker, to actually track changes, update the state,
+get the state and do those types of things.
+Diagram:
+                           ------- service ------------------------------
+                          |           ^                                 |
+                          |           |                                 |
+                          |           | (arrow, forward and downward!)  |
+                          |           |                                 |
+                          |    ---observable store----                  |   subscribe
+component --------->      |   |                       |                 |  <-----------> component
+          <---------      |   |        state          |                 |
+                          |   |-----------------------|                 |
+                          |---------------------------------------------
+
+Now let's use an observable store.
+
+58-09_Observable Store in Action:
+In customers page of our state management application, it shows some customers and orders and allows for some edits.
+First we need to install observable store from npm. Then, you create a service that extends ObservableStore then you need to tell it what's the
+state I want to store in this? (in that case, it's StoreState)
+In customers.service , if you peek on the thing we used as generic on ObservableStore, you'll see it's an interface that stores three things: customers,
+a customer and orders. We defined that StoreState which is an interface in interfaces.ts file.
+Now whenever your app needed a store, you would define it there and then for example the customers.service can now interact with that shape of data.
+
+Then the customers.component it gonna be calling that customers.service so we need to inject that service in that comp and there, we use getAll() method.
+Now we PURPOSELY put the SAME EXACT method NAME that you saw earlier in ngrx-data, but in this case(observable store) we're just calling a normal service.
+So if you click on "go to definition" for getAll() , you'll see the first thing we do is call getState() which getState() comes from observable store base class and
+it's a protected member. Now that's gonna get us any state if we have it(and we assign it to state constant).
+The first time that loads, there won't be any state, so we go to else branch and there, we'll call fetchCustomers() and in that method, we go and
+get the customers from server using HttpClient and then once those customers are mapped back in to our operator, then we're gonna call setState(),
+if we'd like to add those into the store. So in this case, that updates the customers prop(this.setState({customers}, ...)).
+Now setState() also allows the type of action that was performed, to be stored. Now this has nothing to do with an ngrx type of action, this is just a simple string
+value. In the bottom of that file(customers.service), we made an enum and each enum member has a string. That's crucial because as it adds to the state or as it
+sets a state, (like when we call setState() in map() of fetchCustomers()), it will log it and that log now will carry that name for the action.
+
+Now as a heads-up for the logging, the way that works is, because we extended the base class(ObservableStore<>), we have to call super() . In super() , when we
+call that base class constructor, we're passing an option or a setting in () of super() , which is called trackStateHistory and setting that to true.
+That's useful in debugging mode, because everytime sth changes in the state, we can check the before and the after type of picture! and that will show me,
+what's going on in my store.
+
+In orders we do the same thing. OrdersService also extends ObservableStore with same shape of data(StoreState). Now anytime we call setState() ,
+in that case, that's gonna update one property IN the store(because we just passing one prop which is orders, to setState()) which that prop is orders and that way
+we'll always know when our state is changing. Others can subscribe to that if we need to know when the state is changing.
+
+In the app, if we go to an order(for example /orders/2) and then maybe come back again to customers page, we already added a log statement to log out the state history.
+So first we were in /customers and then we went to /orders/2 and then went back to /customers again. What is logged, is:
+4 times, an array of 4 objects, first thing that happened, is that we had get_customers and then get_orders and then we got a single customer with get_customer and then
+get_customers again and in each object, it will show you the begin(beginState) and the end state(endState) of each of those.
+Notice that the beginState of first object in the first array of objects, is null, because there was none state, but the end state ended up with four customers(an array of
+4 customer object).
+In get_orders(the second object in first array of object), in it's beginState, there's only a customers prop there, whereas in the endState,
+there's an orders prop too.
+
+So you can see what's going on with your store state.*/
+/* 60-10_State Management Review:
+ */

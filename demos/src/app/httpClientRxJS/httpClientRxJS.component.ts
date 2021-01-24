@@ -41,7 +41,7 @@ export class HttpClientRxJSComponent implements OnInit  {
   }
 
 
-  searchCharacters() {
+  public searchCharacters() {
     this.formGroup = new FormGroup({
       characterName: new FormControl('', [Validators.required])
     });
