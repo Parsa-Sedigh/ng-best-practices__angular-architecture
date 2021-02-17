@@ -17,6 +17,9 @@ Price: <input type="text" (input)="newProduct.price = $event.target.value" [valu
   </tr>
   <tr *ngFor="let product of products$ | async">
     <td>{{ product.name }}</td>
+
+    <!-- Here, we're taking the output of addTax() function and then we pipe it to a standard currency pipe. Now if you go to
+    the component and look at the function(method of the comp) itself, -->
     <td>{{ addTax(product.price) | currency }}</td>
   </tr>
 </table>
@@ -29,6 +32,9 @@ Price: <input type="text" (input)="newProduct.price = $event.target.value" [valu
   </tr>
   <tr *ngFor="let product of products$ | async">
     <td>{{ product.name }}</td>
+
+    <!-- Here, we have the product.price being written out, BUT we're piping it to addtax pipe and then taking that output into currency pipe.
+     putting in doing -->
     <td>{{ product.price | addtax | currency }}</td>
   </tr>
 </table>

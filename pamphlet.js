@@ -387,7 +387,7 @@ Important: With that, anyone subscribing to that event(by calling on() method of
 
 So that event-bus can handle any number of events and any amount of data associated with those events. Now let's look how we could USE it.*/
 /* 44-06_using an event bus service:
-Let's go to customers-list.component which shows a list of customers and when user click on one of those customers, we want to notify other comps about which
+Let's go to customers-list.component which shows a list of customers and when user click on one of those customers, we want to notify other comps about
 WHICH customer was selected. So we're gonna call this.eventBus.emit(<an instance of EmitEvent() class which needs the name of event we want to emit in that comp and
 optionally the value that emits>); So when a customer is selected we do that. In selectCustomer() the data we emit is the customer that was clicked.
 So that's how one side of the equation can communicate with the middle man which is the event-bus. So it send the event-bus an object which has not only the
@@ -975,4 +975,287 @@ there's an orders prop too.
 
 So you can see what's going on with your store state.*/
 /* 60-10_State Management Review:
- */
+the change notification goal is the notification to other aspects of your app.
+You can create your own store with plain services, but you're not gonna get that out of the box.
+You can make the data immutable, in plain services by using for example immutableJS or just a cloning technique.
+ngrx and ngrx-data have redux devtools for debugging.
+
+In tracking state history, in services, you can build it custom and that's where we start to question: Do you want to build
+it custom or go with sth that already has that built in?
+
+For supporting change notifications in services, we can use subjects and create an observable service, so it WOULD be possible with services.
+
+ngrx-data wraps ngrx.
+
+    goal               ngrx   ngrx-data   observable store    services
+provides store           y        y                 y              n
+immutable data           y        y                 y              n
+debugging                y        y                 n              n
+state history            y        y                 y              n
+change notifications     y        y                 y              n
+simple                   n        y                 y              y
+
+Choosing a state management option:
+We can start to use services with simple apps that aren't complex or just don't have a lot of local state. So maybe your app only talks to the
+server, for everything it does. Well, in that case, you may not need to STORE a lot of state. You may not need the immutable nature of state management and
+the other things we mentioned earlier.
+
+Technically, you could probably use observable-store with simple apps, but if it's really simple, it's good to use just services.
+If you have multiple comps that need to be notified as sth happens, well then maybe you go with ngrx-data or observable store, because they both would
+support subscribing to changes to the state.
+As your app is medium to complex, if you understand redux and the overall pattern provided by ngrx, then ngrx is great.
+
+simple                                complex
+services       ngrx-data       ngrx
+            observable store
+<----------------------------------->
+
+61-11_Summary:
+Services do offer a solution, but theres some challenges there that could come up, as updates are happening in different parts of the app.
+ngrx-data basically wraps all the complexity that you would normally have to deal with. So it takes care of actions and reducers and effects and your selectors,
+for you, plus it adds the bonus of actually call the server for you as well, by using a convention-based approach based on the name of your entities.
+- several state management options exist
+- ngrx provides an established pattern for managing state(but ngrx adds a lot of boilerplate code)
+- ngrx-data provides ngrx support with minimal amount of code
+- observable store provides a simple option that provides the key goals
+- explore different state management options before deciding on one*/
+/* SECTION 7
+61-00_Introduction.6:
+Additional considerations:
+module overview:
+If we call functions from templates, that can actually lead to not only performance problems, but the function getting called an awful LOT,
+a lot more than you might actually think! and Important: we're gonna look how in many cases, we can convert functions to pipes.
+Memo decorator can be used for caching and further enhance, how your pipes work and we're gonna see how it can actually be applied to the
+transform function(method) of a pipe and the benefits it can offer.
+Then we're gonna look at making calls to a server with HttClient. Oftentimes it's not enough just to make a single call and then we have all the data.
+Many times we have to call multiple APIs and sometimes we want to do that in parallel. Other times we wanna wait for a given request to come back and then
+switch over to another request and then merge the data.
+If you need to pass tokens, you might need to use an http interceptor to keep your code very clean.
+
+- functions vs pipes(and the differences between these two, when it comes to performance)
+- using a memo decorator
+- HttpClient and rxjs operators
+- security considerations
+- http interceptors
+
+62-01_Functions vs. Pipes:
+Angular makes it easy to call a function from a template, when you need to perform a calculation or some other type of activity. The problem there, is
+oftentimes that function may be called WAY MORE than you thought it was. In fact, if you just add some simple console.log() statements into the function,
+you'll probably be amazed by how many times it's called.
+In many scenarios we can get much better performance by using pipes instead of functions or methods.
+
+Function(method of component) calls in templates:
+Function calls that are made from a template, are actually invoked EVERY TIME a CHANGE occurs. There's no caching at all that goes on. It's a fresh call(every
+time). So as an example if we were to have:
+calling a function from a template(a grid with columns and ...):
+Here we are calculating the total column in the grid, dynamically if that wasn't actually given to us(if it was given to us, WHY we want to use a method
+or in worse case, call a function ourselves!!!???)
+EX) {{ addTax(product.price) | currency }}
+
+Now if you see it in devtools, it's gonna be called a LOT MORE than you thought, especially if you have other filters, text boxes, drop-downs and things like
+that, that are causing properties to CHANGE in your comp.
+
+Replacing functions with pipes:
+Now what we can do, is replace many of these function calls from a template, with pipes and we can create a pure pipe. That is where the same inputs passed in,
+would always yield the same result and we call that a pure pipe or you might have heard of pure functions.
+Important: Now the difference here is that pipes and the transform() method, are ONLY called, when the inputs change. Other properties that might be in the
+ component may not be changing, but that's not gonna change the inputs to the pipe, so it wouldn't be called with any other changes that occur within a comp.
+Now this is actually a big deal, because with functions, you'll see they're called way more often than you might think.
+
+- A pure pipe returns the same result given the same inputs
+- only called when the inputs are changed
+
+So instead of calling a function to calculate the total, what if we were just to pass the product price into a custom pipe. In this case, we called
+that pipe, addtax and then we can pipe the result of that out to a currency pipe if we wanted to.
+Now addtax is just a function, but because the main functionality is in the transform function of a pipe, other things that are changing
+IN the component, aren't gonna cause that transform function to be called over and over again, everytime a user types in a textbox or selects from a drop-down
+or ... . So we wanna convert functions calls in our template to a custom pipe.
+
+EX) {{ product.price | addtax | currency }}
+
+62-02_Functions and Pipes in Action:
+Go to demos/src/app/pipes-functions and in the template of comp.
+
+As we run the app, it's really just looping through some rows, writing them out, dynamically calculating the price, but we have some other
+properties in the component as well that are gonna be changing, so let's see the impact of that. So run the app and go to /pipes-functions and then in
+Total column of grid, we're calling addTax() as the grid is loading and iterating through those products. Now go to console devtools and see how many times,
+addTax() is logged and therefore called. You'll notice addTax() 10 times for the first line of console, okay, we would expect that,(because in the beginning, as the data comes in,
+the function would be called per each data(in the beginning)) and 10 times, because currently we have 10 rows.
+But notice, due to some other things we're gonna be discussing and really some other things in that page, note that we also have addTax() was called yet AGAIN in
+the console in another line of console.
+Now what's even worse is if we type a single character in the inputs, you see in the console, the addTax() just got called 20 more times and every single time, we
+type, you'll notice is just getting called over and over again for each keystroke. NOW WHY?
+Well, because the data is CHANGING, there's no way for angular to know in this function(addTax() method), what exactly it needs to worry about that is changing and
+so it has to just recall it everytime, to make sure it has the latest data and you can see that's kind of a big deal and it really can lead to a lot of bad
+performance in some scenarios or just really to some unnecessary calls. That's why we're covering it here, because while the architecture may now include other
+pipes you might think through and more crucial than that, is a team understanding the impact of how calling functions(methods) from a view can impact the
+overall page itself.
+Now what can we do to make this a little better?
+Notice the "addtax pipe called" was also called 10 times when the page loads, but ONLY 10 times. Whereas the "addTax() function called" (function call) at a minimum,
+was called 20 times.
+Now that's because the nature of how pipes work. If the inputs to the pipe transform function(method) don't change, then it doesn't need to be recalled. So that
+means if other properties in the comp are changing around this, no big deal!
+
+Now if you start to typing in the inputs, you're gonna see the only thing that's influenced by that, is the function call, but not the pipe call.
+So by typing, the pipe is not affected at all.
+
+The addTax pipe was only called, the number of times that the inputs(to that pipe) changed(and we know we have 10 inputs in the grid), therefore it was
+called 10 times.
+
+Now after that, as we type in the inputs up the page, the inputs to that particular data binding for each row for the total are not changing(and we know those
+total values are the inputs for the addTax pipe). Therefore, it doesn't do anything in case of calling pipe. So if we type, you don't see pipe logging anymore,
+because the inputs to those bindings(total column values) didn't actually change and we know those bindings are tbe inputs of addTax pipe.*/
+/* 63-03_Using a Memo Decorator:
+There's another tricks as we're converting functions to pipes or really just anytime you use pipes and that's to add sth called a memo decorator.
+The memo decorator is gonna enhance the caching of your pipe's transform function(method). So anytime a primitive value or values, is
+passed in, a number, a string, a boolean, sth like that, it'll monitor that value and then see what the output was from the transform method. That output
+value is gonna actually be cached. That way if you pass in 9.99 , it's gonna first say: "ok I've got to do the calculation. I haven't SEEN that YET!", but the
+NEXT time 9.99 might be passed in, then what it'll do is return the CACHED value from the previous run of the transform method.
+You apply memo, right above the transform function.
+
+Learn: Use the memo decorator to enhance caching of a pipe's transform() function when a primitive value is passed.
+
+EX)
+import memo from 'memo-decorator';
+@Pipe({name: 'addtaxmemo'})
+export class AddTaxMemoPipe implements PipeTransform {
+    @memo()
+    transform(value: any, args?: any) {
+        // return product.price + tax;
+    }
+}
+
+Pipe with a memo decorator:
+cache result based on inputs passed into pipe transform()
+
+As mentioned, this will automatically cache the result based on the inputs passed into this pipe transform method. So the last EX can be changed to:
+EX) {{ product.price | addtaxmemo | currency }}
+
+So we can leverage caching, if we have a lot of similar data values.
+
+Now if you go to /pipes-functions route, you see a log which is: "addtexmemo pipe called" and it was only called 7 times, instead of 10 times with a pipe without
+memo. Now if you look at the data that we're passing to that memo pipe, in the page, you'll notice we have some DUPLICATION in the input(why input? Because
+in the page, we're seeing the inputs to that pipe!). For example you see 2 times 269.99 and that's because the data that's being passed in, was actually
+the same price(so the results would be also the same). Likewise we have 3 times 32.39 but we have duplication of them one after the another twice(the first 32.99
+is far from the other two, BUT IT DOESN'T MATTER!).
+The first time, the memo pipe returns 32.99 it would remember the input for that 32.39 result and then even with some space or gap, the input would be the same,
+the memo pipe won't calculate the 32.99 again! So in our example, the 269.99 once and 32.39 will be twice get ignored by memo pipe, but the other ones are unique and
+must be calculated once!
+So from top, 32.39 is calulated and returned, also 269.99, but the next 3 results are not calculated and are returned from cache of pipe and remaining ones, are
+calculated because they're unique.
+
+So what a memo decorator is doing, is this is a caching decorator. @memo is being used to cache simple or in other words, primitive inputs that are being passed
+into transform() . If we had actual objects being passed in, this actually wouldn't work so well. But because for total values we have primitives(and that could be
+numbers, strings, booleans), what this(@memo) will do, is for every unique value passed in, it will actually check that and then the value being passed OUT(return value), gets cached.
+So that way, if down the road, we had 9.99 , well FIRST TIME, it hasn't seen that, so it's gonna have to calculate and it calls the method(transform()).
+Next time 9.99 if is passed in, the memo decorator is gonna say: "oh! I've ALREADY seen this and I already know the RESULT!" and it just echoes back the result, no
+need to call the function(transform()) anymore.
+Obviously if you had a tremendous amount of data, you probably wanna be careful with this, because that is caching in memory. But in scenarios like you're
+seeing in addtax-memo.pipe file, it's actually very efficient to add. By knowing this, you can speed up especially more complex calculations.
+
+In /pipes-functions , if you add a product by typing a name and price and then clicking on the "add button", notice that the addTax() function was now called 22 times!
+addtax pipe was called and so as addtaxmemo. The reason for that?
+We just added a new value which equated to 10.79 after tax. That 9.99(the value that we typed in price input) had not been seen previously(because you notice we didn't have
+10.79 in our grid previously at all, therefore it wasn't cached and the pipe(so the transform() method of pipe) was called to calculate.)
+So the addtax pipe had to be called, because the input changed and the addtaxmemo pipe had to be called and then the memo decorator said: "oh, I haven't seen that value, so
+let me let the transform function run as normal(we haven't cache!) and then I will cache the output."
+Now if you add for example test2 as name of product and AGAIN add 9.99 as it's price, let's see what gets called now?
+Notice as usual! the addTax() function was called(24 times!), the addtax pipe was called(because it has no caching) so that's correct, but notice the memo wasn't!
+and that's because it had already SEEN the INPUT for 9.99 and so it just returned the CACHED output there. So you can think about memo, in scenarios where you have some
+dynamic calculations you need to do, as you're iterating in an *ngFor as an example.
+Now obviously, we'd prefer to do all the totaling in a service or even on a backend server if we can, BUT that's just not always possible. Sometimes the data we get, doesn't
+have exactly what we NEED and for example, we need to to the total ourself, whatever that calculation may be. So this was functions vs pipes in action and kind of
+some of the benefits you can get out of pipes and even an additional benefit you can get, by adding a memo decorator. */
+/* 64-04_HttpClient and RxJS Operators:
+You may notice, multiple calls are made out to APIs. Now you may control these APIs yourself or they may be third-party APIs, but regardless, you might run into
+various scenarios where you wanna make multiple calls simultaneously, or maybe when data comes back, you have to use some data WITHIN that data such as an id or a
+link to go fill in some additional details about that data. For example, you might have a person, when it comes back, it has an id, but it doesn't have an address.
+But maybe there's an address service you can pass the id to, to get that(person's id) back.
+
+diagram:
+              Person API(server)
+ get person  / (arrows both direction)
+            / returnes a person with an id or url
+your machine
+           \  get address
+returns an  \ (arrows in both directions)
+address      \
+                address API(server)
+
+HttpClient and rxjs operators:
+switchMap: This allows us to complete an inner observable and switch to another one.
+
+mergeMap: Allows us to actually return some data and merge it back into the stream that goes back, in this case to the component, for demos that we're
+gonna look at.
+
+forkJoin: If you've ever done a promise.all() before, or just have multiple calls that go out with HTTP and then when they ALL ARE DONE, you wanna
+get that data simultaneously, then forkJoin can work well for that.
+
+now go to /httpclient-rxjs , there, we're going out to a service to get data. Now if we needed to display characters and planets,
+we could make two separate calls and actually wait for ONE to come back and THEN start the next. Or if we want that data at the SAME TIME,
+we could use forkJoin().
+
+In people and homeworlds section, if you go to network tabs and see the people/ http request, in it's result prop and inside one of it's elements,
+you'll notice it has a prop called homeworld which is actually ANOTHER URL! So the homeworld itself doesn't have any data. ONCE(WHEN) that person loads,
+we need to go get additional data(get the data about homeworld of that person) and that means another call to the server. There's some techniqes you can do
+with these scenarios that rxjs operators can be used for. If you go to core/services/httpClient-rxjs.service , in getCharacters() method,
+we're tapping out a log message and then, you can see a map() operator which with that, we're mapping to the property that ACTUALLY has the data we WANT for the
+characters and and then say when we're done with that operation, in last tap().
+
+What if we wanted to call characters AND planets, but know WHEN BOTH of them have COME BACK and COMPLETED?
+Well, we can use forkJoin().
+
+In map() operator inside getCharactersAndPlanets() , we're mapping the response (which is gonna include both of those observables that we passed to forkJoin(), the last
+value from both), into the map function which in there, we're returning a custom object which in there, we grab the characters by getting to res[0] which is the
+first one in forkJoin() and then we get our planets with res[1] which is the second one in forkJoin(). So if you've worked with promise.all() , this is
+very similar, especially in the world of http where you just get back one value per call and this provides a nice way where we could call many things and then know, WHEN ALL
+of them are DONE AT ONCE and then in this case, return that object. So now you can subscribe to that and just get that nice custom object that would have the actual data.
+
+For example of switchMap(), go to getCharacterAndHomeworld() , there we call out to a service and grab a specific individual character and then we not only want to return
+that character, but also go get their homeworld which is a sepearte call. So we're gonna grab the character's homeworld and also update the character's homeworld.
+Now by doing that, with that one call, it not only gets the character itself, but THEN makes a separate call to go get the homeworld data and then we can work with that.
+Now what's being done to make it possible is this code, ALONE, returns an observable: return this.http.get(url) which gets piped. BUT we DON'T want to return the
+actual character, we want to return the tweaked or changed character. So what we're gonna do is, SWITCH TO ANOTHER observable. So: return this.http.get(url) is our
+first observable and then the switchMap() will switch to: return this.http.get(character['homeworld']) observable and then in map() , it's what we're gonna return in that
+observable(this.http.get(character['homeworld'])).
+
+So in switchMap() we say: Alright, I know I have an observable, but I want to go a head and and finish or complete it and THEN switch the map, switch to the observable which
+in that case is: return this.http.get(character['homeworld']) . And then of course, whatever is return from the map() in that case, is ACTUALLY what the subscriber would get
+from that method in general.
+
+Now in httpClient-rxjs.component , *we call getCharactersAndPlanets() and we get the data which has those two properties, the characters and the planets.
+
+In getCharacterAndHomeworld() , with one call, it WILL have to make two separate calls, but that'll be done in a way that we just simply get tht data back and we
+have not only the character, but also the homeworld.
+
+Now what if we want to get all the characters and also their homeworlds, it's trickier?
+Now if you go to network tab, in people/ and in one of the elements in results array, their homeworld is just a url. So what I'd like to do is iterate through all
+the elements in results array and then grab their homeworld, so that once that's passed back, we can get all the data. Now yes, that does mean
+we're gonna make some EXTRA calls. We're gonna get back the array, then we're gonna have to iterate through all 10 of those(elements in results array) and go call the
+homeworlds which is of course, 10 calls to the server. Now you'll see those 10 calls being made in network's name column which are: 1/ 2/ 8/ and ... and some of those, you
+see are from the SAME homeworld(you see /1 is used in multiple cases). So we can use some caching there. But let's see how we could kind of do all that in one shot.
+So go to service file and in getCharactersAndHomeworlds() , the first thing we have to do is to get ALL characters, that gets us back the array of 10 people that you just saw and
+we pipe that in and then we're gonna switch from the people observable(this.http.get(this.baseurl ... )) to a custom observable(from res['results']). So from() is gonna
+convert that array to an observable and pass each of those into mergeMap() . Now what we're gonna do, is whatever is return out of the map there, that's ultimately what we want to
+merge into the observable going back to the subscriber.
+So you can see we really have 3 types of observable there.
+First one is: this.http.get(this.baseUrl + 'people');
+2) return from(['results'])
+3) and our third is what ultimately we want to merge BACK into the subscriber again.
+Again: We'll first get the array(by saying: this.http.get(...)), we'll convert that just normal JS array into an observable using from() , that will then pass each one(each person),
+into that mergeMap() . So in essence, it's like us writing a loop that would loop through each item in the array, but it's doing it with rxjs observables.
+Now we're gonna from that person, get their homeworld url(this.http.get(person['homeworld'])), we'll pipe that result of homeworld(we are mapping hw into a function that we defined!)
+into the map() function and then, we're gonna take that hw and update the properties. So we're really replacing the url that you saw earlier, with the ACTUAL homeworld data and then
+we return it(return person).
+Now I could do that and leave it right there and what would happen is every time one of those comes back, that observable will be pushed to the subscriber. In this case, we
+wanted to get everything back as kind of ONE BIG batch and so we called toArray() . So by doing this, we can get data for nested properties, in this casae, homeworld and
+while there is other ways to do this, this provides one way that rxjs could be used for this type of scenario.
+
+
+Now that mergeMap() won't guarantee that the order of people is preserved as(when) they are returned. Use concatMap()
+
+By using switchMap(), we can actually take an observable and return switch to another observable.
+mergeMap() allows us to merge custom data into an observable.
+forkJoin() allows us to make as many calls as we want and be notified, when the last value from each of those calls is returned, which in case of http, you only get one value ANYWAY!!!
+
+So with these, we make sure that we're doing parallel calls to APIs as needed versus serial calls as needed.*/
