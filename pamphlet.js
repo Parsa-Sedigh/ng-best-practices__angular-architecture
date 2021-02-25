@@ -1252,10 +1252,228 @@ wanted to get everything back as kind of ONE BIG batch and so we called toArray(
 while there is other ways to do this, this provides one way that rxjs could be used for this type of scenario.
 
 
-Now that mergeMap() won't guarantee that the order of people is preserved as(when) they are returned. Use concatMap()
+Important: Note that mergeMap() won't guarantee that the order of people is preserved as(when) they are returned. Use concatMap() if you want the
+ original order of people preserved.
 
 By using switchMap(), we can actually take an observable and return switch to another observable.
 mergeMap() allows us to merge custom data into an observable.
 forkJoin() allows us to make as many calls as we want and be notified, when the last value from each of those calls is returned, which in case of http, you only get one value ANYWAY!!!
 
 So with these, we make sure that we're doing parallel calls to APIs as needed versus serial calls as needed.*/
+/* 65-05_Key Security Considerations:
+The true security happens in backend.
+- cross-origin resource sharing(CORS)
+- cross site request forgery(CSRF) attacks
+- route guards
+- sensitive data in an app
+
+CORS: CORS is very common in many apps, because our app domain that serves up our angular app, may actually call other domains or even the same domain, but
+different ports(so may call same domain but on different ports). Anytime we do that, that's a cross-domain call and the browser shuts it off.
+So if we were calling http://acmecorp.comp and tht served up our app, then of course we can just call back to it, but if we want to call some other API(http://someapi.com),
+we're gonna have to enable CORS on the server, otherwise that call is gonna be blocked. Now how you turn on cross-origin resource sharing, it really depends on the
+technology that you're using on your server. Regardless of what you do, there are some things to think about there, to really lock down the apps
+as much as possible.
+So as mentioned, CORS allows a browser to call a different domain or port(on the same domain) and in order for CORS to work, we have to enable it on the
+server as it's needed. So this is not sth we can do in our angular app. One crucial consideration here is to limit the allowed domains, the allowed headers and the
+allowed HTTP methods that can call into your API. Now this again would involve on your server side, limiting what domains are actually allowed to call in or headers or
+methods. Now if it's a public API, you're gonna probably allow start(anything) for your domains. But you may limit your headers to just the key ones that are
+needed and of course you may limit your http methods to sth like GET, PUT, POST and DELETE as appropriate. So the big consideration here is that while CORS
+is kind of a necessary part of our lives when you have APIs and other domains, make sure you limit that as much as possible.
+
+Diagram:
+        http://acmecorp.com
+browser <--------------->   server
+        \
+          \ http:someotherapi.com
+           \  (arrows up and down)  this connection wouldn't done until you enable cors on this server
+            \
+              server
+CSRF(XSRF): This is the process of someone sending you for example an email and they try to trick you into going off to THEIR site.
+1) Now the hope here is that you've ALREADY logged-in to a site such as yourbank.com and then a cookie was set.
+2) Now you get the email and click it and this is a phishing type email. That directs you off you a bad site which looks exactly like the bank site of course.
+3) and 4) The bad site then is gonna send through your browser(3)), 4) a request to the API of the good site, the bank and because you would have
+already logged in to the site and maybe have an encrypted cookie set, we hope it's encrypted anyway, then your browser will basically send a
+malicious request and the bad site could then get your data.
+
+So the big thing here is if you're using any type of cookie authentication and there are plenty of frameworks out there that use this,
+then you want to enable CSRF on the server so that if you're using this cookie authentication, we can do some validation. Now the way it
+works is the server will send down a cookie with a special token in it. Angular will then read that and set it as a request header. Now ONLY the
+same DOMAIN can set this request header. So now the bad site can't set the request header and now when the request is made up to the
+server, if that request header wasn't there, it would be blocked and that request would not go through. Now in angular, if you need to change the(that)
+cookie that you look for, that the server sends(which that server was sent that cookie), to get this token out of it, or if you need to change
+the header that's sent, you can actually do that. You can see the dos on security-xsrf-protection. But definitely sth we have had to tweak on
+occasion depending on the server setup that we have and then as mentioned, the server's gonna validate that header value and that's how we can
+circumvent or stop this type of CSRF attack.
+Recap:
+- enable csrf on the server if using cookie authentication
+- angular will read a token from a cookie set by the server and add it to the request headers
+- change the cookie/header name as appropriate for your server
+- server will validate the header value(that's how we can stop this type of CSRF attack)
+
+Note that a simple POST request can be used for a CSRF attack!
+So it's definitely sth you'll want to take into account for your APIs on the server, it might involve a little angular code potentially.
+As we mentioned, if you need to tweak it some, it'd be a very a simple tweak.
+
+diagram:
+           bad site server
+          /
+         / 2) (After clicking the bad email) user visits the badsite.com in another tab/window (XSS, etc) (arrow upward-towards the badsite.com)
+        /  3) badsite.com sends a fake page that looks like yourbank.com to the user (arrow downward towards the user's browser)
+       /
+browser
+       \  4) Victim's browser send malicious request to yourbank.com with user credentials (arrow downward)
+        \ 1) User logs in to yourbank.com and creates session(arrow up and down)
+         \
+           good site server
+
+Route guards: Route guards are a great way to direct a user to a login screen or some other page if they don't have the proper security credentials
+as dictated by the server. Or maybe they're not in the proper role or group.
+Now the big thing here is keep in mind that there's no such thing as security in browser! The server of course is the ULTIMATE source of security
+for your data, your API, all of that type of stuff. So keep in mind that while route guards are very helpful for helping direct
+a user through your different views and routes on the client side, we're of course still gonna have to add the proper security to the server side.
+
+Recap:
+- define route guards needed by the app based on user or group/role
+- keep in mind that route guards don't "secure" an application
+- rely on the server to secure data, APIs, etc
+
+Sensitive data:
+Secrets are used to call APIs.
+Now where we see a problem comes up sometimes is when you're calling a third-party API and you're calling that directly from angular, but
+you need to pass a key and a secret in order to call it, well, some people will pass that secret down to angular, store it and then
+angular will have that locally as it calls your API and of course anybody that wants to get that secret, could and now THEY could call the
+API AS WELL! So sth to consider here is, if an API requires a secret to be passed, you might actually consider setting up an API of your own,
+I call it a middle-man service, that angular would call, it's server side and IT would know how to load the secret. But by doing this, you're
+never passing that secret down to angular. So what then would happen is angular will call YOUR api, that api then forwards the request, includes
+the key and the secret to the third-party api and that way we're not having to pass any secrets down to angular.
+
+The final one relates to authentication and some authorization concepts. There are a lot of apps that use cookies, but if you have an API that
+supports JWTs(JSON web tokens), that's a good thing. 1) Because now we don't have to have a cookie container, first off, 2) but also because
+the tokens can be set to expire and then we might have to get a refresh token and then that way, they can't be hijacked as easily as angular is
+calling into these different APIs. So if you have that opportunity to set that up, that's not a bad thing.
+These were the the key security concepts that you should think about right up front. Some additional considerations:
+Authentication on the server and how that's gonna interact with angular, any authorization such as roles or groups and then of course, are you gonna
+use HTTPS? Now you definitely would want that between angular and an API, but then you have the decision of what if that API calls other APIs?
+Do we have end-to-end HTTPS? Or is it just point-to-point?
+
+diagram:
+                          data                          data and secret
+browser(angular client) -------->  middle-man service ------------------>   API service
+
+- anyone can access the browser developer tools to view(get your) variables, local/session storage, cookies, etc
+- do not store sensitive data(secrets, keys(kind of secret keys), passwords, etc) in the browser
+- if an API requires a "secret" to be passed, consider calling it through a "middle-man" service that you own.
+- use JWT tokens where possible for server authentication(set appropriate TTL expiration for tokens) */
+/* 66-06_HTTP Interceptors:
+It's a service, because of @Injectable() on top. The intercept() function can access the request. We could clone it and then we can change things.
+So in this case we're gonna enable withCredentials for a CORS request. That way if cookies are being used for authentication and we
+need to pass some of the information IN the cookie, we can do that by setting withCredentials: true. We're also setting a header on the
+request called X-Requested-With, so that if we want to know on the server what type of request is being made, we can easily identify that.
+Now once we clone that request, we can then pass it into the next and that would cause the next interceptor in a line if we had multiple, to be called.
+Now this can be useful for some cross-domain requests where CORS is being used and you have some authentication information secured in a cookie,
+typically it'll be encrypted and then you want to pass that along, or you just want to set some request headers.
+
+ex)
+@Injectable()
+export class CorsInterceptor implements HttpInterceptor {
+    intercept(req: HttpRequest<any>, next: HttpHandler): Observable<HttpEvent<any>> {
+        const authReq = req.clone({
+            withCredentials: true,
+            headers: req.headers.set('X-Requested-With', 'XMLHttpRequest')
+        });
+
+        return next.handle(authReq);
+    }
+}
+
+HTTP interceptors and CORS:
+- HTTP interceptors provide a centralized place to hook into requests/responses
+- Add withCredentials when using cookies and calling via CORS
+
+
+HTTP interceptors and tokens:
+Interceptors can be used to pass tokens required by services.
+An example of using interceptor in the case of JWTs. If we had a service that's retrieved a token that could be used to authenticate into an API,
+then we could retrieve that here. Now in this example we're kinda hard coding a token just so you can see an example of that, but
+you'll notice in the comment off to the right, we could obviously inject authService or whatever your service is called, into this and then
+call some type of a function(method) such as getAuthToken(). Once we have the authToken, we can pass that into the authorization header and we
+do that again by cloning the request and then using the headers prop to set that header. Now if you have a server-side API that looks for
+these JWT tokens, we can get to those. Now what this'll do is in the browser, it'll actually go in and set this, as request header which you can
+see in devTools and that would be a request header that now goes up and then it would be up to the server to validate that.
+
+EX)
+@Injectable()
+export class AuthInterceptor implements HttpInterceptor {
+    intercept(req: HttpRequest<any>, next: HttpHandler): Observable<HttpEvent<any>> {
+
+        // Get the auth header(fake value is shown here)
+        const authHeader = '49a5k...'; // this.authService.getAuthToken()
+        const authReq = req.clone({
+            headers: req.headers.set('Authorization', authHeader)
+        });
+
+        return next.handle(authReq)
+    }
+}
+
+Registering an HTTP interceptor:
+Interceptors can be provided in the CoreModule.
+Since more than one interceptor can be used, set multi to true.
+Now to register your HTTP interceptors, you can go into a module such as CoreModule, which is where instructor always put his interceptors because
+that's our singleton type of area and we can provide for out HTTP interceptors.
+Wwe use multi: true because you could have multiple interceptors. Now the order the interceptors are registered here is the order in which they're
+called and that's where the next(next.handle()) comes into play in the previous two examples that I showed.
+
+@NgModule({
+    providers: [
+        {
+           provide: HTTP_INTERCEPTOR,
+           useClass: AuthInterceptor,
+           multi: true
+        }
+    ]
+})
+export class CoreModule {}
+
+Now go to '/httpclient-rxjs'. There we have an example of setting the authorization header as HTTP requests are made. If you go to devTools, network,
+people/ request and in it's Headers tab, you see we have our tokens set in the Authorization as the request header and now that would go up to the server and
+it would be up to that API to validate it. In THIS case the result of using this AuthInterceptor is now every request could send that Authorization header
+automatically and now you don't have to manually set the request header in each HTTP call.
+
+We can use interceptors to show and hide a spinner as(when) a request is being made to show some progress and any other time you
+want to KNOW about the request or get to the response, you could use an interceptor.
+
+You can use interceptors in case related to security or show and hide spinners(or other progress indicators), so show a spinner as the request starts and
+then hide it when the response comes back.
+We can modify request such as headers or just know when the request is going out or when you need to get access immediately to the response to grab sth
+from it.
+
+67-07_Summary.2
+Although views CAN call functions you need to be careful there in many cases pipes may be a better alternative. @memo decorator can cache some of your
+data when primitive types are being passed in to the pipe transform() method.
+
+Remember: JS frontend type apps don't provide true security! Because html, JS and memory are directly accessible to others and us. So we can
+pretty much get to everything. So are we gonna use windows authentication? Just cookie authentication? JWTs? This needs to be discussed up front,
+so that you know how to plan for your angular services making calls into your APIs on the backend.
+
+- use pipes over functions in views(when possible)
+
+- leverage rxjs operators when making httpClient calls to the server
+
+- use http interceptors to modify requests and access responses in a centralized place
+
+- take time to carefully evaluate the security needs of the app*/
+/* 68-00_Course Summary:
+Go see angular-architecute-planning and angular-architecute-planning-example . By organizing features into modules using core and shared modules and even
+building custom libraries, we would have a flexible app and we can use lazy loading in routing.
+With cloning we can immediately understand and ensure WHEN objects are CHANGING in our comps and ... .
+
+@Input() and @Output() props work well in container-presentation or general parent/child component scenarios, you may have a need to communicate between
+comps located at different levels of app. To handle this scenario, you can use different component communication techniques including event bus services and
+observable services. Different type of subjects can be used for communication.
+
+Function calls in template:
+Function calls made from a template are invoked every time a change occurs(no caching).
+
+Replacing functions with pipes:
+A pure pipe returns the same result given the same inputs. Only called when inputs are changed.*/
